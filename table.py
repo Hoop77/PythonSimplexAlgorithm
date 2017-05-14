@@ -63,7 +63,7 @@ class LinearProgram:
                 row.append( 0 )
 
         for c in range( 1, len( self.targetFunction ) ):
-            row.append( self.targetFunction[ c ] )
+            row.append( -self.targetFunction[ c ] )
 
         self.tableau.append( row )
 
@@ -223,7 +223,7 @@ class LinearProgram:
 
 if __name__ == '__main__':
 
-    targetFunction = [ 0, -1, -1 ]
+    targetFunction = [ 0, 1, 1 ]
     restrictions = [
         [ 1, -1, 1 ],
         [ 3, 1, 0 ],
