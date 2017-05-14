@@ -2,93 +2,144 @@ from fractions import Fraction
 import numpy
 import math
 
-class Table:
+class LinearProgram:
 
-    def __init__( self, tableData, base, nobase ):
-        self.tableData = tableData
-        self.base = base
-        self.nobase = nobase
-        self.numRows = self.getNumRows()
-        self.numCols = self.getNumCols()
-        self.rowLabels = self.getRowLabels( base )
-        self.colLabels = self.getColLabels( base, nobase )
+    def __init__( self, targetFunction, restrictions, baseVariables, nonBaseVariables ):
+        self.targetFunction = targetFunction
+        self.restrictions = restrictions
+        self.baseVariables = baseVariables
+        self.nonBaseVariables = nonBaseVariables
 
-    def printTable( self ):
+    def printTableau( self ):
         print( "\t", end = "" )
-        for c in range( len( self.colLabels ) ):
-            print( self.colLabels[ c ], end = "\t" )
+        for c in range( len( self.colVariables ) ):
+            print( self.colVariables[ c ], end = "\t" )
 
         print( "" )
 
         for r in range( self.numRows ):
             for c in range( self.numCols ):
                 if( c == 0 ):
-                    print( self.rowLabels[ r ], end = "\t" )
-                fraction = Fraction.from_float( self.tableData[ c ][ r ] ).limit_denominator()
+                    print( self.rowVariables[ r ], end = "\t" )
+                fraction = Fraction.from_float( self.tableau[ r ][ c ] ).limit_denominator()
                 print( fraction, end = "\t" )
             print( "" )
         print( "" )
 
-    def solve( self ):
-        self.printTable()
+    def solve( self, lexicographic ):
+        self.lexicographic = lexicographic
+        self.prepareTableau()
+        self.printTableau()
         
         pivotCol = self.findPivotCol()
         while pivotCol != -1:
             pivotRow = self.findPivotRow( pivotCol )
 
             # output pivot row and column
-            print( "pivot-row: " + self.rowLabels[ pivotRow ] )
-            print( "pivot-column: " + self.colLabels[ pivotCol ] )
+            print( "pivot-row: " + self.rowVariables[ pivotRow ] )
+            print( "pivot-column: " + self.colVariables[ pivotCol ] )
 
-            self.createNewTable( pivotCol, pivotRow )
-            self.printTable()
+            self.createNewTableau( pivotCol, pivotRow )
+            self.printTableau()
             pivotCol = self.findPivotCol()
 
+    def prepareTableau( self ):
+        self.numRows = self.getNumRows()
+        self.numCols = self.getNumCols()
+        self.rowVariables = self.getRowVariables()
+        self.colVariables = self.getColVariables()
+
+        self.tableau = []
+        self.createFirstRowOfTableau()
+        self.createBodyOfTableau()
+
+    def createFirstRowOfTableau( self ):
+        # first row = target function
+        row = []
+        row.append( self.targetFunction[ 0 ] )
+
+        if self.lexicographic:
+            for b in self.baseVariables:
+                row.append( 0 )
+
+        for c in range( 1, len( self.targetFunction ) ):
+            row.append( self.targetFunction[ c ] )
+
+        self.tableau.append( row )
+
+    def createBodyOfTableau( self ):
+        for r in range( 0, self.numRows - 1 ):
+            row = []
+            row.append( self.restrictions[ r ][ 0 ] )
+
+            if self.lexicographic:
+                for c in range( len( self.baseVariables ) ):
+                    if r == c:
+                        row.append( 1 )
+                    else:
+                        row.append( 0 )
+                
+            for c in range( len( self.nonBaseVariables ) ):
+                row.append( self.restrictions[ r ][ c + 1 ] )
+
+            self.tableau.append( row )
+
     def findPivotCol( self ):
-        for r in range( 1, len( tableData ) ):
-            val = self.tableData[ r ][ 0 ]
+        for c in range( 1, self.numCols ):
+            val = self.tableau[ 0 ][ c ]
             if( val < 0 ):
-                return r
+                return c
         return -1
 
     def findPivotRow( self, pivotCol ):
+        if self.lexicographic:
+            return self.findPivotRowByLexicographicSearch( pivotCol )
+
+        return self.findPivotRowByNormalSearch( pivotCol )
+            
+    def findPivotRowByLexicographicSearch( self, pivotCol ):
         possiblePivotRows = self.getRowsWherePivotElementIsGreaterThanZero( pivotCol )
-        tupleList = self.getTupleListFromCol( 0, pivotCol, possiblePivotRows )
+        tuples = self.getTuplesFromCol( 0, pivotCol, possiblePivotRows )
         for c in range( self.numCols ):
-            possiblePivotRows = self.extractPossiblePivotRowsFromTupleList( tupleList )
+            possiblePivotRows = self.extractPossiblePivotRowsFromTuplesInLexicographicOrder( tuples )
             if len( possiblePivotRows ) == 1:
                 break
-            tupleList = self.getTupleListFromCol( c, pivotCol, possiblePivotRows )
+            tuples = self.getTuplesFromCol( c, pivotCol, possiblePivotRows )
         
         return possiblePivotRows[ 0 ]
+
+    def findPivotRowByNormalSearch( self, pivotCol ):
+        possiblePivotRows = self.getRowsWherePivotElementIsGreaterThanZero( pivotCol )
+        tuples = self.getTuplesFromCol( 0, pivotCol, possiblePivotRows )
+        return self.extractPossiblePivotRowsFromTuplesInLexicographicOrder( tuples )[ 0 ]
 
     def getRowsWherePivotElementIsGreaterThanZero( self, pivotCol ):
         rows = []
         for r in range( 1, self.numRows ):
-            pivotElement = self.tableData[ pivotCol ][ r ]
+            pivotElement = self.tableau[ r ][ pivotCol ]
             if pivotElement > 0:
                 rows.append( r )
         return rows
 
-    def getTupleListFromCol( self, currCol, pivotCol, possiblePivotRows ):
+    def getTuplesFromCol( self, currCol, pivotCol, possiblePivotRows ):
         """
         currCol, pivotCol are indices
         returns a list of tuples where each tuple represents:
         (lexicographic value, row)
         """
-        tupleList = []
+        tuples = []
         for r in possiblePivotRows:
-            val = self.tableData[ currCol ][ r ] / self.tableData[ pivotCol ][ r ]
+            val = self.tableau[ r ][ currCol ] / self.tableau[ r ][ pivotCol ]
             t = ( val, r )
-            tupleList.append( t )
-        return tupleList
+            tuples.append( t )
+        return tuples
 
-    def extractPossiblePivotRowsFromTupleList( self, tupleList ):
-        tupleList.sort()
+    def extractPossiblePivotRowsFromTuplesInLexicographicOrder( self, tuples ):
+        tuples.sort()
         possiblePivotRows = []
-        firstTuple = tupleList[ 0 ]
+        firstTuple = tuples[ 0 ]
         firstVal = firstTuple[ 0 ]
-        for t in tupleList:
+        for t in tuples:
             val = t[ 0 ]
             row = t[ 1 ]
             if val != firstVal:
@@ -97,92 +148,89 @@ class Table:
 
         return possiblePivotRows
 
-    def createNewTable( self, pivotCol, pivotRow ):
-        newTableData = self.createEmptyTable()
+    def createNewTableau( self, pivotCol, pivotRow ):
+        newTableau = self.createEmptyTable()
 
-        rowLabel = self.rowLabels[ pivotRow ]
-        swapCol = self.colLabels.index( rowLabel )
+        # mind the swap of column in lexicographic mode
+        pivotRowVariable = self.rowVariables[ pivotRow ]
+        swappedCol = 0
+        if self.lexicographic:
+            swappedCol = self.colVariables.index( pivotRowVariable )
+        else:
+            swappedCol = pivotCol
 
         self.swapBase( pivotCol, pivotRow )
-        pivotElement = self.tableData[ pivotCol ][ pivotRow ]
+        pivotElement = self.tableau[ pivotRow ][ pivotCol ]
         
-        for c in range( self.numCols ):
-            for r in range( self.numRows ):
-                if c == swapCol and r == pivotRow:
-                    newTableData[ c ][ r ] = 1 / pivotElement
-                elif c == swapCol and r != pivotRow:
-                    newTableData[ c ][ r ] = self.tableData[ pivotCol ][ r ] / pivotElement * -1
-                elif c != swapCol and r == pivotRow:
-                    newTableData[ c ][ r ] = self.tableData[ c ][ r ] / pivotElement
+        for r in range( self.numRows ):
+            for c in range( self.numCols ):
+                if c == swappedCol and r == pivotRow:
+                    newTableau[ r ][ c ] = 1 / pivotElement
+                elif c == swappedCol and r != pivotRow:
+                    newTableau[ r ][ c ] = self.tableau[ r ][ pivotCol ] / pivotElement * -1
+                elif c != swappedCol and r == pivotRow:
+                    newTableau[ r ][ c ] = self.tableau[ r ][ c ] / pivotElement
                 else:
-                    newTableData[ c ][ r ] = (self.tableData[ c ][ r ] - \
-                    ( (self.tableData[ pivotCol ][ r ] * self.tableData[ c ][ pivotRow ]) / pivotElement ))
+                    newTableau[ r ][ c ] = (self.tableau[ r ][ c ] - \
+                    ( (self.tableau[ r ][ pivotCol ] * self.tableau[ pivotRow ][ c ]) / pivotElement ))
         
-        self.tableData = newTableData
+        self.tableau = newTableau
 
     def createEmptyTable( self ):
-        newTableData = []
-        for c in range( self.numCols ):
-            col = []
-            for r in range( self.numRows ):
-                col.append( 0 )
-            newTableData.append( col )
-        return newTableData
-
+        newTableau = []
+        for r in range( self.numRows ):
+            row = []
+            for c in range( self.numCols ):
+                row.append( 0 )
+            newTableau.append( row )
+        return newTableau
         
     def swapBase( self, pivotCol, pivotRow ):
-        colLabel = self.colLabels[ pivotCol ]
-        self.rowLabels[ pivotRow ] = colLabel
+        pivotRowVariable = self.rowVariables[ pivotRow ]
+        pivotColVariable = self.colVariables[ pivotCol ]
 
-    def getRowLabels( self, base ):
-        rowLabels = [ "" ]
-        for b in base:
-            rowLabels.append( b )
-        return rowLabels
+        self.rowVariables[ pivotRow ] = pivotColVariable
 
-    def getColLabels( self, base, nonbase ):
-        colLabels = [ "" ]
-        for b in base:
-            colLabels.append( b )
-        for n in nonbase:
-            colLabels.append( n )
-        return colLabels
+        if not self.lexicographic:
+            self.colVariables[ pivotCol ] = pivotRowVariable
+
+    def getRowVariables( self ):
+        rowVariables = [ "" ]
+        for b in self.baseVariables:
+            rowVariables.append( b )
+        return rowVariables
+
+    def getColVariables( self ):
+        colVariables = [ "" ]
+
+        if( self.lexicographic ):
+            for b in self.baseVariables:
+                colVariables.append( b )
+
+        for n in self.nonBaseVariables:
+            colVariables.append( n )
+
+        return colVariables
 
     def getNumRows( self ):
-        return len( self.tableData[ 0 ] )
+        return len( self.baseVariables ) + 1
 
     def getNumCols( self ):
-        return len( self.tableData )
+        if self.lexicographic:
+            return len( self.nonBaseVariables ) + len( self.baseVariables ) + 1
+        else:
+            return len( self.nonBaseVariables ) + 1
 
 if __name__ == '__main__':
 
-    # tableData = [
-    #         [ 4, 8, 12, -4 ],
-    #         [ 0, 1, 0, 0 ],
-    #         [ 0, 0, 1, 0 ],
-    #         [ 0, 0, 0, 1 ],
-    #         [ 1, 2, -1, -1 ],
-    #         [ 1, -1, 3, -1 ],
-    #         [ -5, 2, 3, 5 ],
-    #         [ 1, 0, 0, -1 ]
-    #     ]
-
-    # base = [ "u1", "u2", "y3" ]
-    # nobase = [ "x1", "x2", "x3", "u3" ]
-
-    tableData = [
-        [ 0, 0, 0, 1 ],
-        [ 0, 1, 0, 0 ],
-        [ 0, 0, 1, 0 ],
-        [ 0, 0, 0, 1 ],
-        [ -0.75, 0.25, 0.5, 0 ],
-        [ 150, -60, -90, 0 ],
-        [ -0.02, -0.04, -0.02, 3 ],
-        [ 6, 9, 3, 0 ]
+    targetFunction = [ 0, -1, -1 ]
+    restrictions = [
+        [ 1, -1, 1 ],
+        [ 3, 1, 0 ],
+        [ 2, 0, 1 ]
     ]
+    baseVariables = [ "u1", "u2", "u3" ]
+    nonBaseVariables = [ "x1", "x2" ]
 
-    base = [ "u1", "u2", "u3" ]
-    nobase = [ "x1", "x2", "x3", "x4" ]
-
-    table = Table( tableData, base, nobase )
-    table.solve()
+    lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables )
+    lp.solve( False )
