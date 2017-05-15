@@ -34,6 +34,9 @@ class LinearProgram:
         pivotCol = self.findPivotCol()
         while pivotCol != -1:
             pivotRow = self.findPivotRow( pivotCol )
+            if pivotRow == -1:
+                print( "The linear program is not solvable!" )
+                break;
 
             # output pivot row and column
             print( "pivot-row: " + self.rowVariables[ pivotRow ] )
@@ -106,10 +109,16 @@ class LinearProgram:
                 break
             tuples = self.getTuplesFromCol( c, pivotCol, possiblePivotRows )
         
+        if len( possiblePivotRows ) == 0:
+            return -1
+
         return possiblePivotRows[ 0 ]
 
     def findPivotRowByNormalSearch( self, pivotCol ):
         possiblePivotRows = self.getRowsWherePivotElementIsGreaterThanZero( pivotCol )
+        if len( possiblePivotRows ) == 0:
+            return -1
+
         tuples = self.getTuplesFromCol( 0, pivotCol, possiblePivotRows )
         return self.extractPossiblePivotRowsFromTuplesInLexicographicOrder( tuples )[ 0 ]
 
@@ -223,14 +232,15 @@ class LinearProgram:
 
 if __name__ == '__main__':
 
-    targetFunction = [ 0, 1, 1 ]
+    targetFunction = [ 15, 3.5, 2.5 ]
     restrictions = [
-        [ 1, -1, 1 ],
-        [ 3, 1, 0 ],
-        [ 2, 0, 1 ]
+        [ 8, 2, -1 ],
+        [ 7, 1.5, -0.5 ],
+        [ 3, 0.5, -0.5 ],
+        [ 0, -4, 1 ]
     ]
-    baseVariables = [ "u1", "u2", "u3" ]
-    nonBaseVariables = [ "x1", "x2" ]
+    baseVariables = [ "u1", "u2", "x1", "u4" ]
+    nonBaseVariables = [ "x2", "u3" ]
 
     lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables )
     lp.solve( False )
