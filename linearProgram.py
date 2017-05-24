@@ -11,6 +11,7 @@ class LinearProgram:
         self.nonBaseVariables = nonBaseVariables
         self.lexicographic = lexicographic
         self.prepareTableau()
+        self.numGeneratedVariables = 0
 
     def printTableau( self ):
         print( "\t", end = "" )
@@ -35,7 +36,7 @@ class LinearProgram:
             pivotRow = self.findPivotRow( pivotCol )
             if pivotRow == -1:
                 print( "The linear program is not solvable!" )
-                break;
+                return False
 
             # output pivot row and column
             print( "pivot-row: " + self.rowVariables[ pivotRow ] )
@@ -45,19 +46,69 @@ class LinearProgram:
             self.printTableau()
             pivotCol = self.findPivotCol()
 
+        return True
+
+    def maximizeInteger( self ):
+        print( "Calculate relaxation" )
+        print( "====================" )
+        self.maximize()
+        nonIntegerRow = self.findNonIntegerRow()
+        while nonIntegerRow != -1:
+            self.addGomorySchmittRow( nonIntegerRow )
+
+            print( "Minimize" )
+            print( "========" )
+            if not self.minimize():
+                return False
+
+            nonIntegerRow = self.findNonIntegerRow()
+
+        return True
+
+    def findNonIntegerRow( self ):
+        for r in range( self.numRows ):
+            if not self.isInteger( self.tableau[ r ][ 0 ] ):
+                return r
+        return -1
+
+    def isInteger( self, floatVal ):
+        fraction = Fraction.from_float( floatVal ).limit_denominator()
+        if fraction.denominator == 1:
+            return True
+        else:
+            return False
+
+    def addGomorySchmittRow( self, targetRow ):
+        newRow = []
+        for val in self.tableau[ targetRow ]:
+            gomorySchmittVal = -(val - math.floor( val ))
+            newRow.append( gomorySchmittVal )
+            
+        self.addRows( [ newRow ] )
+
+        self.numGeneratedVariables += 1
+        genVariable = "g" + str( self.numGeneratedVariables )
+        self.addRowVariables( [ genVariable ] )
+
     def remaximize( self, additionalRestrictions, additionalBaseVariables ):
-        self.addRestrictions( additionalRestrictions )
-        self.additionalBaseVariables( additionalBaseVariables )
+        """
+        Only non-lexicographic way supported!
+        """
+        self.addRows( additionalRestrictions )
+        self.addRowVariables( additionalBaseVariables )
         self.minimize()
 
     def minimize( self ):
+        """
+        Only non-lexicographic way supported!
+        """
         self.printTableau()
         pivotRow = self.findPivotRowDual()
         while pivotRow != -1:
             pivotCol = self.findPivotColDual( pivotRow )
             if pivotCol == -1:
                 print( "The linear program is not solvable!" )
-                break;
+                return False
 
             # output pivot row and column
             print( "pivot-row: " + self.rowVariables[ pivotRow ] )
@@ -67,15 +118,15 @@ class LinearProgram:
             self.printTableau()
             pivotRow = self.findPivotRowDual()
 
-    def addRestrictions( self, additionalRestrictions ):
-        for restriction in additionalRestrictions:
-            self.restrictions.append( restriction )
-            self.tableau.append( restriction )
+        return True
+
+    def addRows( self, rows ):
+        for row in rows:
+            self.tableau.append( row )
             self.numRows += 1
 
-    def additionalBaseVariables( self, additionalBaseVariables ):
+    def addRowVariables( self, additionalBaseVariables ):
         for baseVariable in additionalBaseVariables:
-            self.baseVariables.append( baseVariable )
             self.rowVariables.append( baseVariable )
 
     def prepareTableau( self ):
@@ -314,21 +365,34 @@ class LinearProgram:
 
 if __name__ == '__main__':
 
-    targetFunction = [ 8, -9, -4 ]
+    # # maximize
+    # targetFunction = [ 8, -9, -4 ]
+    # restrictions = [
+    #     [ 2, 2, 3 ],
+    #     [ 5, 8, 9 ]
+    # ]
+    # baseVariables = [ "x1", "x2" ]
+    # nonBaseVariables = [ "x1", "u2" ]
+
+    # lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables, False )
+    # lp.maximize()
+
+    # # remaximize
+    # additionalRestrictions = [ 
+    #     [ -1, -2, 1 ]
+    # ]
+    # additionalBaseVariables = [ "u3" ]
+
+    # lp.remaximize( additionalRestrictions, additionalBaseVariables )
+
+    # maximize
+    targetFunction = [ 0, 2, 1 ]
     restrictions = [
-        [ 2, 2, 3 ],
-        [ 5, 8, 9 ]
+        [ 4, -1, 2 ],
+        [ 20, 5, 1 ]
     ]
-    baseVariables = [ "x1", "x2" ]
-    nonBaseVariables = [ "x1", "u2" ]
+    baseVariables = [ "u1", "u2" ]
+    nonBaseVariables = [ "x1", "x2" ]
 
     lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables, False )
-    lp.maximize()
-
-    additionalRestrictions = [ 
-        [ -1, -2, 1 ]
-    ]
-
-    additionalBaseVariables = [ "u3" ]
-
-    lp.remaximize( additionalRestrictions, additionalBaseVariables )
+    lp.maximizeInteger()
