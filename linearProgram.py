@@ -4,11 +4,13 @@ import math
 
 class LinearProgram:
 
-    def __init__( self, targetFunction, restrictions, baseVariables, nonBaseVariables ):
+    def __init__( self, targetFunction, restrictions, baseVariables, nonBaseVariables, lexicographic ):
         self.targetFunction = targetFunction
         self.restrictions = restrictions
         self.baseVariables = baseVariables
         self.nonBaseVariables = nonBaseVariables
+        self.lexicographic = lexicographic
+        self.prepareTableau()
 
     def printTableau( self ):
         print( "\t", end = "" )
@@ -26,11 +28,8 @@ class LinearProgram:
             print( "" )
         print( "" )
 
-    def solve( self, lexicographic ):
-        self.lexicographic = lexicographic
-        self.prepareTableau()
+    def maximize( self ):
         self.printTableau()
-        
         pivotCol = self.findPivotCol()
         while pivotCol != -1:
             pivotRow = self.findPivotRow( pivotCol )
@@ -45,6 +44,39 @@ class LinearProgram:
             self.createNewTableau( pivotCol, pivotRow )
             self.printTableau()
             pivotCol = self.findPivotCol()
+
+    def remaximize( self, additionalRestrictions, additionalBaseVariables ):
+        self.addRestrictions( additionalRestrictions )
+        self.additionalBaseVariables( additionalBaseVariables )
+        self.minimize()
+
+    def minimize( self ):
+        self.printTableau()
+        pivotRow = self.findPivotRowDual()
+        while pivotRow != -1:
+            pivotCol = self.findPivotColDual( pivotRow )
+            if pivotCol == -1:
+                print( "The linear program is not solvable!" )
+                break;
+
+            # output pivot row and column
+            print( "pivot-row: " + self.rowVariables[ pivotRow ] )
+            print( "pivot-column: " + self.colVariables[ pivotCol ] )
+
+            self.createNewTableau( pivotCol, pivotRow )
+            self.printTableau()
+            pivotRow = self.findPivotRowDual()
+
+    def addRestrictions( self, additionalRestrictions ):
+        for restriction in additionalRestrictions:
+            self.restrictions.append( restriction )
+            self.tableau.append( restriction )
+            self.numRows += 1
+
+    def additionalBaseVariables( self, additionalBaseVariables ):
+        for baseVariable in additionalBaseVariables:
+            self.baseVariables.append( baseVariable )
+            self.rowVariables.append( baseVariable )
 
     def prepareTableau( self ):
         self.numRows = self.getNumRows()
@@ -90,15 +122,30 @@ class LinearProgram:
     def findPivotCol( self ):
         for c in range( 1, self.numCols ):
             val = self.tableau[ 0 ][ c ]
-            if( val < 0 ):
+            if val < 0:
                 return c
         return -1
+
+    def findPivotColDual( self, pivotRow ):
+        possiblePivotCols = self.getColsWherePivotElementIsSmallerThanZero( pivotRow )
+        if len( possiblePivotCols ) == 0:
+            return -1
+
+        tuples = self.getTuplesFromRow( 0, pivotRow, possiblePivotCols )
+        return self.extractPossiblePivotColsFromTuplesInLexicographicOrder( tuples )[ 0 ]
 
     def findPivotRow( self, pivotCol ):
         if self.lexicographic:
             return self.findPivotRowByLexicographicSearch( pivotCol )
 
         return self.findPivotRowByNormalSearch( pivotCol )
+
+    def findPivotRowDual( self ):
+        for r in range( 1, self.numRows ):
+            val = self.tableau[ r ][ 0 ]
+            if val < 0:
+                return r
+        return -1
             
     def findPivotRowByLexicographicSearch( self, pivotCol ):
         possiblePivotRows = self.getRowsWherePivotElementIsGreaterThanZero( pivotCol )
@@ -130,6 +177,14 @@ class LinearProgram:
                 rows.append( r )
         return rows
 
+    def getColsWherePivotElementIsSmallerThanZero( self, pivotRow ):
+        cols = []
+        for c in range( 1, self.numCols ):
+            pivotElement = self.tableau[ pivotRow ][ c ]
+            if pivotElement < 0:
+                cols.append( c )
+        return cols
+
     def getTuplesFromCol( self, currCol, pivotCol, possiblePivotRows ):
         """
         currCol, pivotCol are indices
@@ -140,6 +195,19 @@ class LinearProgram:
         for r in possiblePivotRows:
             val = self.tableau[ r ][ currCol ] / self.tableau[ r ][ pivotCol ]
             t = ( val, r )
+            tuples.append( t )
+        return tuples
+
+    def getTuplesFromRow( self, currRow, pivotRow, possiblePivotCols ):
+        """
+        currRow, pivotRow are indices
+        returns a list of tuples where each tuple represents:
+        (lexicographic value, column)
+        """
+        tuples = []
+        for c in possiblePivotCols:
+            val = self.tableau[ currRow ][ c ] / self.tableau[ pivotRow ][ c ]
+            t = ( val, c )
             tuples.append( t )
         return tuples
 
@@ -154,6 +222,20 @@ class LinearProgram:
             if val != firstVal:
                 break
             possiblePivotRows.append( row )
+
+        return possiblePivotRows
+
+    def extractPossiblePivotColsFromTuplesInLexicographicOrder( self, tuples ):
+        tuples.sort()
+        possiblePivotRows = []
+        firstTuple = tuples[ 0 ]
+        firstVal = firstTuple[ 0 ]
+        for t in tuples:
+            val = t[ 0 ]
+            col = t[ 1 ]
+            if val != firstVal:
+                break
+            possiblePivotRows.append( col )
 
         return possiblePivotRows
 
@@ -232,15 +314,21 @@ class LinearProgram:
 
 if __name__ == '__main__':
 
-    targetFunction = [ 15, 3.5, 2.5 ]
+    targetFunction = [ 8, -9, -4 ]
     restrictions = [
-        [ 8, 2, -1 ],
-        [ 7, 1.5, -0.5 ],
-        [ 3, 0.5, -0.5 ],
-        [ 0, -4, 1 ]
+        [ 2, 2, 3 ],
+        [ 5, 8, 9 ]
     ]
-    baseVariables = [ "u1", "u2", "x1", "u4" ]
-    nonBaseVariables = [ "x2", "u3" ]
+    baseVariables = [ "x1", "x2" ]
+    nonBaseVariables = [ "x1", "u2" ]
 
-    lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables )
-    lp.solve( False )
+    lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables, False )
+    lp.maximize()
+
+    additionalRestrictions = [ 
+        [ -1, -2, 1 ]
+    ]
+
+    additionalBaseVariables = [ "u3" ]
+
+    lp.remaximize( additionalRestrictions, additionalBaseVariables )
