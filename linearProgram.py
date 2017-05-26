@@ -3,8 +3,21 @@ import numpy
 import math
 
 class LinearProgram:
-
+    
     def __init__( self, targetFunction, restrictions, baseVariables, nonBaseVariables, lexicographic ):
+        """
+        targetFunction: Array of numbers having the form: [ b, c_1, ..., c_n ]
+        representing the function: b + c_1*x_1 + ... + c_n*x_n
+
+        restrictions: Array of restrictions. A restriction has the form: [ b, a_1, ..., a_n ]
+        representing the equation a_1*x_1 + ... + a_n*x_n <= b.
+
+        baseVariables: Array of strings representing the variable names for base-variables.
+
+        nonBaseVariables: Array of string representing the variable names for non-base-variables.
+
+        lexicographic: Boolean which states whether the lexicographic version of the algorithm is used.
+        """
         self.targetFunction = targetFunction
         self.restrictions = restrictions
         self.baseVariables = baseVariables
@@ -257,7 +270,7 @@ class LinearProgram:
         """
         tuples = []
         for c in possiblePivotCols:
-            val = self.tableau[ currRow ][ c ] / self.tableau[ pivotRow ][ c ]
+            val = self.tableau[ currRow ][ c ] / abs( self.tableau[ pivotRow ][ c ] )
             t = ( val, c )
             tuples.append( t )
         return tuples
@@ -386,13 +399,14 @@ if __name__ == '__main__':
     # lp.remaximize( additionalRestrictions, additionalBaseVariables )
 
     # maximize
-    targetFunction = [ 0, 2, 1 ]
+    targetFunction = [ 0, 3, -5, 4 ]
     restrictions = [
-        [ 4, -1, 2 ],
-        [ 20, 5, 1 ]
+        [ 6, 3, 1, 1 ],
+        [ 6, 1, 2, 3 ],
+        [ 3, 1, -1, 2 ]
     ]
-    baseVariables = [ "u1", "u2" ]
-    nonBaseVariables = [ "x1", "x2" ]
+    baseVariables = [ "u1", "u2", "u3" ]
+    nonBaseVariables = [ "x1", "x2", "x3" ]
 
     lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables, False )
     lp.maximizeInteger()
