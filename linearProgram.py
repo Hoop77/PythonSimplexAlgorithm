@@ -233,7 +233,7 @@ class LinearProgram:
             if val < 0:
                 for c in range( 1, self.numCols ):
                     if self.tableau[ r ][ c ] < 0:
-                        return c
+                        return r
                 nonValidRowFound = True
         
         if nonValidRowFound:
