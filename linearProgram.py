@@ -3,7 +3,7 @@ import numpy
 import math
 
 class LinearProgram:
-    
+
     def __init__( self, targetFunction, restrictions, baseVariables, nonBaseVariables, lexicographic ):
         """
         targetFunction: Array of numbers having the form: [ b, c_1, ..., c_n ]
@@ -45,11 +45,8 @@ class LinearProgram:
     def maximize( self ):
         self.printTableau()
         pivotCol = self.findPivotCol()
-        while pivotCol != -1:
+        while pivotCol > 0:
             pivotRow = self.findPivotRow( pivotCol )
-            if pivotRow == -1:
-                print( "The linear program is not solvable!" )
-                return False
 
             # output pivot row and column
             print( "pivot-row: " + self.rowVariables[ pivotRow ] )
@@ -58,6 +55,10 @@ class LinearProgram:
             self.createNewTableau( pivotCol, pivotRow )
             self.printTableau()
             pivotCol = self.findPivotCol()
+
+        if pivotCol == -2:
+            print( "The linear program is not solvable!" )
+            return False
 
         return True
 
@@ -117,11 +118,8 @@ class LinearProgram:
         """
         self.printTableau()
         pivotRow = self.findPivotRowDual()
-        while pivotRow != -1:
+        while pivotRow > 0:
             pivotCol = self.findPivotColDual( pivotRow )
-            if pivotCol == -1:
-                print( "The linear program is not solvable!" )
-                return False
 
             # output pivot row and column
             print( "pivot-row: " + self.rowVariables[ pivotRow ] )
@@ -130,6 +128,10 @@ class LinearProgram:
             self.createNewTableau( pivotCol, pivotRow )
             self.printTableau()
             pivotRow = self.findPivotRowDual()
+
+        if pivotRow == -2:
+            print( "The linear program is not solvable!" )
+            return False
 
         return True
 
@@ -184,10 +186,24 @@ class LinearProgram:
             self.tableau.append( row )
 
     def findPivotCol( self ):
+        """
+        return
+        > 0: valid pivot column found
+        -1:  all values in row 0 are positive -> linear program is solved
+        -2:  there exists rows where value in row 0 is < 0 but all elements inside those columns are also < 0
+        """
+        nonValidColFound = False
         for c in range( 1, self.numCols ):
             val = self.tableau[ 0 ][ c ]
             if val < 0:
-                return c
+                for r in range( 1, self.numRows ):
+                    if self.tableau[ r ][ c ] > 0:
+                        return c
+                nonValidColFound = True
+        
+        if nonValidColFound:
+            return -2
+        
         return -1
 
     def findPivotColDual( self, pivotRow ):
@@ -205,10 +221,24 @@ class LinearProgram:
         return self.findPivotRowByNormalSearch( pivotCol )
 
     def findPivotRowDual( self ):
+        """
+        return
+        > 0: valid pivot row found
+        -1:  all values in col 0 are positive -> linear program is solved
+        -2:  there exists rows where value in column 0 is < 0 but all elements inside those columns are also > 0
+        """
+        nonValidRowFound = False
         for r in range( 1, self.numRows ):
             val = self.tableau[ r ][ 0 ]
             if val < 0:
-                return r
+                for c in range( 1, self.numCols ):
+                    if self.tableau[ r ][ c ] < 0:
+                        return c
+                nonValidRowFound = True
+        
+        if nonValidRowFound:
+            return -2
+
         return -1
             
     def findPivotRowByLexicographicSearch( self, pivotCol ):
@@ -291,7 +321,7 @@ class LinearProgram:
 
     def extractPossiblePivotColsFromTuplesInLexicographicOrder( self, tuples ):
         tuples.sort()
-        possiblePivotRows = []
+        possiblePivotCols = []
         firstTuple = tuples[ 0 ]
         firstVal = firstTuple[ 0 ]
         for t in tuples:
@@ -299,9 +329,9 @@ class LinearProgram:
             col = t[ 1 ]
             if val != firstVal:
                 break
-            possiblePivotRows.append( col )
+            possiblePivotCols.append( col )
 
-        return possiblePivotRows
+        return possiblePivotCols
 
     def createNewTableau( self, pivotCol, pivotRow ):
         newTableau = self.createEmptyTable()
@@ -398,15 +428,32 @@ if __name__ == '__main__':
 
     # lp.remaximize( additionalRestrictions, additionalBaseVariables )
 
+############################################################
+
+    # # maximize
+    # targetFunction = [ 0, 3, -5, 4 ]
+    # restrictions = [
+    #     [ 6, 3, 1, 1 ],
+    #     [ 6, 1, 2, 3 ],
+    #     [ 3, 1, -1, 2 ]
+    # ]
+    # baseVariables = [ "u1", "u2", "u3" ]
+    # nonBaseVariables = [ "x1", "x2", "x3" ]
+
+    # lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables, False )
+    # lp.maximizeInteger()
+
+###############################################################
+
     # maximize
-    targetFunction = [ 0, 3, -5, 4 ]
+    targetFunction = [ 15/4, 13/4, 5/4 ]
     restrictions = [
-        [ 6, 3, 1, 1 ],
-        [ 6, 1, 2, 3 ],
-        [ 3, 1, -1, 2 ]
+        [ 0, 0, 1 ],
+        [ 3/4, -1/4, -1/4 ],
+        [ 23/4, -5/4, -1/4 ]
     ]
-    baseVariables = [ "u1", "u2", "u3" ]
-    nonBaseVariables = [ "x1", "x2", "x3" ]
+    baseVariables = [ "u1", "x1", "u3" ]
+    nonBaseVariables = [ "x2", "u2" ]
 
     lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables, False )
-    lp.maximizeInteger()
+    lp.maximize()
