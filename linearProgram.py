@@ -446,14 +446,13 @@ if __name__ == '__main__':
 ###############################################################
 
     # maximize
-    targetFunction = [ 15/4, 13/4, 5/4 ]
+    targetFunction = [ 0, 3, -2, 2 ]
     restrictions = [
-        [ 0, 0, 1 ],
-        [ 3/4, -1/4, -1/4 ],
-        [ 23/4, -5/4, -1/4 ]
+        [ 7, 2, 1, 2 ],
+        [ 13, 3, 4, 2 ]
     ]
-    baseVariables = [ "u1", "x1", "u3" ]
-    nonBaseVariables = [ "x2", "u2" ]
+    baseVariables = [ "u1", "u2" ]
+    nonBaseVariables = [ "x1", "x2", "x3" ]
 
     lp = LinearProgram( targetFunction, restrictions, baseVariables, nonBaseVariables, False )
-    lp.maximize()
+    lp.maximizeInteger()
